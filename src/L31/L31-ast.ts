@@ -47,7 +47,7 @@ import { Sexp, Token } from "s-expression";
 
 export type Exp = DefineExp | CExp;
 export type AtomicExp = NumExp | BoolExp | StrExp | PrimOp | VarRef;
-export type CompoundExp = AppExp | IfExp | ProcExp | LetExp | LitExp ;
+export type CompoundExp = AppExp | IfExp | ProcExp | LetExp | LitExp;
 export type CExp =  AtomicExp | CompoundExp;
 
 export type Program = {tag: "Program"; exps: Exp[]; }
@@ -65,10 +65,7 @@ export type ProcExp = {tag: "ProcExp"; args: VarDecl[], body: CExp[]; }
 export type Binding = {tag: "Binding"; var: VarDecl; val: CExp; }
 export type LetExp = {tag: "LetExp"; bindings: Binding[]; body: CExp[]; }
 // L3
-export type LitExp = {tag: "LitExp"; val: SExpValue; } 
-// // L31
-// export type DictExp = {tag: "DictExp"; items: LitExp;}
-// export type GetExp = {tag: "GetExp"; dict: DictExp; key: SExpValue; }
+export type LitExp = {tag: "LitExp"; val: SExpValue; }
 
 // Type value constructors for disjoint types
 export const makeProgram = (exps: Exp[]): Program => ({tag: "Program", exps: exps});
@@ -94,13 +91,6 @@ export const makeLetExp = (bindings: Binding[], body: CExp[]): LetExp =>
 // L3
 export const makeLitExp = (val: SExpValue): LitExp =>
     ({tag: "LitExp", val: val});
-// // L31
-// export const makeDictExp = (items: LitExp): DictExp =>
-//     ({tag: "DictExp", items: items});
-// export const makeGetExp = (dict: DictExp, key: SExpValue): GetExp =>
-//     ({tag: "GetExp", dict: dict, key: key});
-
-
 
 // Type predicates for disjoint types
 export const isProgram = (x: any): x is Program => x.tag === "Program";
@@ -120,17 +110,12 @@ export const isBinding = (x: any): x is Binding => x.tag === "Binding";
 export const isLetExp = (x: any): x is LetExp => x.tag === "LetExp";
 // L3
 export const isLitExp = (x: any): x is LitExp => x.tag === "LitExp";
-// // L31
-// export const isDictExp = (x: any): x is DictExp => x.tag === "DictExp";
-// export const isGetExp = (x: any): x is GetExp => x.tag === "GetExp";
-
 
 // Type predicates for type unions
 export const isExp = (x: any): x is Exp => isDefineExp(x) || isCExp(x);
 export const isAtomicExp = (x: any): x is AtomicExp =>
     isNumExp(x) || isBoolExp(x) || isStrExp(x) ||
-    isPrimOp(x) || isVarRef(x) ;
-    // isDictExp(x) || isGetExp(x); // L31
+    isPrimOp(x) || isVarRef(x);
 export const isCompoundExp = (x: any): x is CompoundExp =>
     isAppExp(x) || isIfExp(x) || isProcExp(x) || isLitExp(x) || isLetExp(x);
 export const isCExp = (x: any): x is CExp =>
@@ -222,8 +207,7 @@ export const parseL31Atomic = (token: Token): Result<CExp> =>
 const isPrimitiveOp = (x: string): boolean =>
     ["+", "-", "*", "/", ">", "<", "=", "not", "and", "or",
      "eq?", "string=?", "cons", "car", "cdr", "list", "pair?",
-     "number?", "boolean?", "symbol?", "string?", 
-     "dict", "get", "dict?"].includes(x);
+     "number?", "boolean?", "symbol?", "string?"].includes(x);
 
 const isSpecialForm = (x: string): boolean =>
     ["if", "lambda", "let", "quote"].includes(x);
