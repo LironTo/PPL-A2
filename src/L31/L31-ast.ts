@@ -66,9 +66,9 @@ export type Binding = {tag: "Binding"; var: VarDecl; val: CExp; }
 export type LetExp = {tag: "LetExp"; bindings: Binding[]; body: CExp[]; }
 // L3
 export type LitExp = {tag: "LitExp"; val: SExpValue; } 
-// L31
-export type DictExp = {tag: "DictExp"; items: LitExp;}
-export type GetExp = {tag: "GetExp"; dict: DictExp; key: SExpValue; }
+// // L31
+// export type DictExp = {tag: "DictExp"; items: LitExp;}
+// export type GetExp = {tag: "GetExp"; dict: DictExp; key: SExpValue; }
 
 // Type value constructors for disjoint types
 export const makeProgram = (exps: Exp[]): Program => ({tag: "Program", exps: exps});
@@ -94,11 +94,11 @@ export const makeLetExp = (bindings: Binding[], body: CExp[]): LetExp =>
 // L3
 export const makeLitExp = (val: SExpValue): LitExp =>
     ({tag: "LitExp", val: val});
-// L31
-export const makeDictExp = (items: LitExp): DictExp =>
-    ({tag: "DictExp", items: items});
-export const makeGetExp = (dict: DictExp, key: SExpValue): GetExp =>
-    ({tag: "GetExp", dict: dict, key: key});
+// // L31
+// export const makeDictExp = (items: LitExp): DictExp =>
+//     ({tag: "DictExp", items: items});
+// export const makeGetExp = (dict: DictExp, key: SExpValue): GetExp =>
+//     ({tag: "GetExp", dict: dict, key: key});
 
 
 
@@ -120,16 +120,17 @@ export const isBinding = (x: any): x is Binding => x.tag === "Binding";
 export const isLetExp = (x: any): x is LetExp => x.tag === "LetExp";
 // L3
 export const isLitExp = (x: any): x is LitExp => x.tag === "LitExp";
-// L31
-export const isDictExp = (x: any): x is DictExp => x.tag === "DictExp";
-export const isGetExp = (x: any): x is GetExp => x.tag === "GetExp";
+// // L31
+// export const isDictExp = (x: any): x is DictExp => x.tag === "DictExp";
+// export const isGetExp = (x: any): x is GetExp => x.tag === "GetExp";
 
 
 // Type predicates for type unions
 export const isExp = (x: any): x is Exp => isDefineExp(x) || isCExp(x);
 export const isAtomicExp = (x: any): x is AtomicExp =>
     isNumExp(x) || isBoolExp(x) || isStrExp(x) ||
-    isPrimOp(x) || isVarRef(x);
+    isPrimOp(x) || isVarRef(x) ;
+    // isDictExp(x) || isGetExp(x); // L31
 export const isCompoundExp = (x: any): x is CompoundExp =>
     isAppExp(x) || isIfExp(x) || isProcExp(x) || isLitExp(x) || isLetExp(x);
 export const isCExp = (x: any): x is CExp =>
