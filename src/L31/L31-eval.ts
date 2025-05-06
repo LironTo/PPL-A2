@@ -1,6 +1,6 @@
 // L31-eval.ts
 import { map } from "ramda";
-import { isCExp, isLetExp } from "./L31-ast";
+import { isCExp, isDictExp, isLetExp } from "./L31-ast";
 import { BoolExp, CExp, Exp, IfExp, LitExp, NumExp,
          PrimOp, ProcExp, Program, StrExp, VarDecl } from "./L31-ast";
 import { isAppExp, isBoolExp, isDefineExp, isIfExp, isLitExp, isNumExp,
@@ -33,6 +33,7 @@ const L31applicativeEval = (exp: CExp, env: Env): Result<Value> =>
     isAppExp(exp) ? bind(L31applicativeEval(exp.rator, env), (rator: Value) =>
                         bind(mapResult(param => L31applicativeEval(param, env), exp.rands), (rands: Value[]) =>
                             L31applyProcedure(rator, rands, env))) :
+    isDictExp(exp) ? makeOk(exp.val) :
     isLetExp(exp) ? makeFailure('"let" not supported (yet)') :
     exp;
 
