@@ -1,0 +1,39 @@
+(define list?
+  (lambda (x)
+    (if (eq? x '())
+        #t
+        (if (pair? x)
+            (list? (cdr x))
+            #f))))
+
+(define dict (lambda (pairs) pairs))
+
+(define get
+  (lambda (d k)
+    (if (pair? d)
+        (if (eq? (car (car d)) k)
+            (cdr (car d))
+            (get (cdr d) k))
+        (make-error "Key not found"))))
+
+(define dict?
+  (lambda (x)
+    (if (list? x)
+        (if (pair? (car x))
+            (symbol? (car (car x)))
+            #f)
+        #f)))
+
+(define make-error (lambda (msg) (list 'error msg)))
+
+(define is-error?
+  (lambda (x)
+    (if (list? x)
+        (eq? (car x) 'error)
+        #f)))
+
+(define bind
+  (lambda (v f)
+    (if (is-error? v)
+        v
+        (f v))))
