@@ -78,7 +78,7 @@ const transformCExp = (exp: L32CExp): CExp =>
         : exp as CExp; // Atomic expressions are structurally the same
 
 // Transforms an L32.Program into an L3.Program
-export const L32toL3 = (prog: L32Program): Program =>
+export const L32toL3 = (prog: Program): Program =>
     makeProgram(prog.exps.map(exp =>
         isDefineExp(exp)
             ? makeDefineExp(exp.var, transformCExp(exp.val))
