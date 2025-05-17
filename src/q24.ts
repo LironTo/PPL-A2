@@ -9,7 +9,7 @@ import {
 } from './L32/L32-value';
 
 import {
-    makeProgram, makeDefineExp, makeAppExp, makeLitExp, makeVarRef,
+    makeProgram, makeDefineExp, makeAppExp, makeLitExp, makeVarRef, makeVarDecl,
     makeIfExp, makeProcExp, makeLetExp, makeBinding,
     Program, CExp, Exp
 } from './L3/L3-ast';

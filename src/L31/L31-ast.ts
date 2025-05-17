@@ -201,7 +201,7 @@ export const parseL31Atomic = (token: Token): Result<CExp> =>
 
 /*
     ;; <prim-op>  ::= + | - | * | / | < | > | = | not | and | or | eq? | string=?
-    ;;                  | cons | car | cdr | pair? | number? | list
+    ;;                  | cons | car | cdr | pair? | number? | list| dict| dict?| get 
     ;;                  | boolean? | symbol? | string?      ##### L3
 */
 const isPrimitiveOp = (x: string): boolean =>

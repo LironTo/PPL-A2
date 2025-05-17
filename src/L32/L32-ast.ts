@@ -32,7 +32,7 @@ import { Sexp, Token } from "s-expression";
 ;;         |  ( if <cexp> <cexp> <cexp> )   / IfExp(test: CExp, then: CExp, alt: CExp)
 ;;         |  ( let ( binding* ) <cexp>+ )  / LetExp(bindings:Binding[], body:CExp[]))
 ;;         |  ( quote <sexp> )              / LitExp(val:SExp)
-;;         | ( dict ( <identifier> <cexp> )* ) / DictExp(entries: List(DictEntry))
+;;         | ( dict <binding>+ ) / DictExp(entries: List(DictEntry))
 ;;         |  ( <cexp> <cexp>* )            / AppExp(operator:CExp, operands:CExp[]))
 ;; <binding>  ::= ( <var> <cexp> )           / Binding(var:VarDecl, val:Cexp)
 ;; <prim-op>  ::= + | - | * | / | < | > | = | not |  and | or | eq? | string=?
@@ -158,7 +158,7 @@ export const parseL32CompoundExp = (op: Sexp, params: Sexp[]): Result<Exp> =>
     op === "define"? parseDefine(params) :
     parseL32CompoundCExp(op, params);
 
-// CompoundCExp -> IfExp | ProcExp | LetExp | LitExp | AppExp
+// CompoundCExp -> IfExp | ProcExp | LetExp | LitExp | AppExp | DictExp
 export const parseL32CompoundCExp = (op: Sexp, params: Sexp[]): Result<CExp> =>
     isString(op) && isSpecialForm(op) ? parseL32SpecialForm(op, params) :
     parseAppExp(op, params);
@@ -175,7 +175,7 @@ export const parseL32SpecialForm = (op: Sexp, params: Sexp[]): Result<CExp> =>
     op === "quote" ? 
         isNonEmptyList<Sexp>(params) ? parseLitExp(first(params)) :
         makeFailure(`Bad quote exp: ${params}`) :
-        op === "dict" ?
+    op === "dict" ?
         isNonEmptyList<Sexp>(params) ? parseDictExp(params) :
         makeFailure(`Bad dict exp: ${params}`) :
     makeFailure("Never");
@@ -262,15 +262,12 @@ export const parseLitExp = (param: Sexp): Result<LitExp> =>
     mapv(parseSExp(param), (sexp: SExpValue) => 
          makeLitExp(sexp));
 
-const parseDictExp = (pairs: Sexp[]): Result<DictExp> => {
-    if (!isGoodBindings(pairs)) {
-        return makeFailure('Malformed bindings in "dict" expression');
-    }
-    const entriesResult = mapResult(parseDictEntry, pairs);
-    return bind(entriesResult, (entries: DictEntry[]) => 
+const parseDictExp = (pairs: Sexp[]): Result<DictExp> => 
+    !isGoodBindings(pairs) ? makeFailure('Malformed bindings in "dict" expression') :
+    bind(mapResult(parseDictEntry, pairs), (entries: DictEntry[]) => 
                 makeOk({tag: "DictExp", entries: entries}));
 
-}
+
 const parseDictEntry = (pair: Sexp): Result<DictEntry> =>
     !isNonEmptyList(pair) || pair.length !== 2 ? 
         makeFailure(`Each dict entry must be a pair: ${JSON.stringify(pair)}`) :
