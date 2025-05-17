@@ -50,6 +50,16 @@ import {
       : isBoolExp(ast)  ? makeOk(ast.val ? "true" : "false")
       : isStrExp(ast)   ? makeOk(JSON.stringify(ast.val))
       : isVarRef(ast)   ? makeOk(ast.var)
+      : isPrimOp(ast)
+      ? (ast.op === "number?"
+          ? makeOk("((x) => typeof(x) === 'number')")
+        : ast.op === "boolean?"
+          ? makeOk("((x) => typeof(x) === 'boolean')")
+        : ast.op === "eq?"
+          ? makeOk("((x, y) => x === y)")
+        : makeOk(ast.op))
+    
+
   
       // 4) if → `(<test> ? <then> : <else>)`
       : isIfExp(ast)
@@ -85,7 +95,7 @@ import {
             switch (ast.rator.op) {
               case "+": case "-": case "*": case "/":
               case "<": case ">":
-                return makeOk(`(${args.join(` ${ast.rator.op} `)})`);
+                return makeOk(`(${args.join(` ${ast.rator.op} `)})`); //(1+2+3)
               case "=":
                 return makeOk(`(${args.join(" === ")})`);
               case "and":
@@ -94,16 +104,19 @@ import {
                 return makeOk(`(${args.join(" || ")})`);
               case "not":
                 return makeOk(`(!${args[0]})`);
-              case "number?":
-                return makeOk(`(typeof ${args[0]} === "number")`);
+                case "number?":
+                  return makeOk(`((x) => typeof(x) === 'number')(${args[0]})`);
               case "boolean?":
-                return makeOk(`(typeof ${args[0]} === "boolean")`);
-              case "eq?":
-                return makeOk(`(${args[0]} === ${args[1]})`);
+                  return makeOk(`((x) => typeof(x) === 'boolean')(${args[0]})`);
+                  case "eq?":
+                    return makeOk(`(${args[0]} === ${args[1]})`);
+                
+              
               default:
                 return makeFailure(`Unknown primitive: ${ast.rator.op}`);
             }
           }
+
           // 6b) normal function call → `f(arg1,arg2,…)`
           else {
             const funR = l2ToJS(ast.rator);
