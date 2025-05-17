@@ -1,88 +1,96 @@
+import { Program as ProgramL3, makeProgram as makeL3Program, makeProgram, parseL3 } from './L3/L3-ast';
+
+
+import { makeOk, makeFailure, isOk, isFailure} from './shared/result'
+
 import {
     isProgram, isDefineExp, isCExp, isAppExp, isIfExp, isProcExp, isLetExp, isLitExp,
     isNumExp, isBoolExp, isStrExp, isPrimOp, isVarRef, isDictExp,
-    Program as L32Program, CExp as L32CExp, Exp as L32Exp
+    Program as L32Program, CExp as L32CExp, Exp as L32Exp,
+    LitExp,
+    isAtomicExp,
+    makePrimOp,
+    isVarDecl,
+    Binding,
+    isBinding,
+    unparseL32
 } from './L32/L32-ast';
 
 import {
-    SExpValue as L32SExpValue
-} from './L32/L32-value';
-
-import {
-    makeProgram, makeDefineExp, makeAppExp, makeLitExp, makeVarRef, makeVarDecl,
+    makeDefineExp, makeAppExp, makeLitExp, makeVarRef,
     makeIfExp, makeProcExp, makeLetExp, makeBinding,
-    Program, CExp, Exp
-} from './L3/L3-ast';
+    CExp, Exp, AppExp, DictExp, DictEntry, VarDecl, VarRef, Program as ProgramL32,
+    makeProgram as makeL32Program,
+} from './L32/L32-ast';
 
 import {
     makeCompoundSExp, makeEmptySExp, makeSymbolSExp,
     SExpValue, CompoundSExp
-} from './L3/L3-value';
+} from './L32/L32-value';
 
-import { map } from "ramda";
 
-// Converts L32 SExpValue to L3 SExpValue
-const valueToL3SExp = (val: L32SExpValue): SExpValue => {
-    if (typeof val === "number" || typeof val === "boolean" || typeof val === "string") return val;
-    if (val.tag === "SymbolSExp") return makeSymbolSExp(val.val);
-    if (val.tag === "EmptySExp") return makeEmptySExp();
-    if (val.tag === "CompoundSexp") return makeCompoundSExp(valueToL3SExp(val.val1), valueToL3SExp(val.val2));
-    throw new Error(`Unsupported SExpValue: ${JSON.stringify(val)}`);
-};
 
-// Converts L32.CExp to SExpValue (for quoted literals)
-const convertCExpToSExpValue = (exp: L32CExp): SExpValue => {
-    if (isNumExp(exp)) return exp.val;
-    if (isBoolExp(exp)) return exp.val;
-    if (isStrExp(exp)) return exp.val;
-    if (isVarRef(exp)) return makeSymbolSExp(exp.var);
-    if (isPrimOp(exp)) return makeSymbolSExp(exp.op);
-    if (isLitExp(exp)) return valueToL3SExp(exp.val);
-    if (isDictExp(exp)) return dictToSExpList(exp.entries);
-    return makeSymbolSExp("unsupported");
-};
 
-// Converts dictionary entries to quoted dotted list structure
-const dictToSExpList = (entries: { key: string; val: L32CExp }[]): CompoundSExp => {
-    const pairs: CompoundSExp[] = entries.map(entry =>
-        makeCompoundSExp(
-            makeSymbolSExp(entry.key),
-            convertCExpToSExpValue(entry.val)
-        )
+import { map, reduce } from "ramda";
+/*
+Purpose: rewrite all occurrences of DictExp in a program to AppExp.
+Signature: Dict2App (exp)
+Type: Program -> Program
+*/
+
+// Converts L32 DictExp to L3 AppExp
+// SymbolSExp | EmptySExp | CompoundSExp
+export const dictToAppExp = (exp: DictExp): AppExp => 
+    makeAppExp(
+        makeVarRef("dict"),
+        [EntriesToLitExp(exp.entries)]
     );
 
-    let result: CompoundSExp = makeCompoundSExp(pairs[pairs.length - 1], makeEmptySExp());
-    for (let i = pairs.length - 2; i >= 0; i--) {
-        result = makeCompoundSExp(pairs[i], result);
-    }
-    return result;
-};
+// Converts DictEntries to LitExp
+export const EntriesToLitExp = (entries: DictEntry[]): LitExp => 
+    makeLitExp(reduce(
+        (acc: SExpValue, curr: SExpValue) =>
+            makeCompoundSExp(
+                curr,
+                acc
+            ),
+            makeCompoundSExp(makeEmptySExp(),makeEmptySExp()),
+            map((x: DictEntry) => makeCompoundSExp(makeSymbolSExp(x.key), CExpToSExp(x.val)), entries)))
+    
+export const CExpToSExp = (exp: CExp|VarDecl|Binding): SExpValue => 
+    isNumExp(exp) ? makeSymbolSExp(String(exp.val)) :
+    isBoolExp(exp) ? makeSymbolSExp(String(exp.val)) :
+    isStrExp(exp) ? makeSymbolSExp(exp.val) :
+    isVarRef(exp) ? makeSymbolSExp(exp.var) :
+    isVarDecl(exp) ? makeSymbolSExp(exp.var) :
+    isBinding(exp) ? makeCompoundSExp(CExpToSExp(exp.var), CExpToSExp(exp.val)) :
+    isPrimOp(exp) ? makeSymbolSExp(exp.op) :
+    isProcExp(exp) ? makeCompoundSExp(makeSymbolSExp("lambda"), makeCompoundSExp(
+        reduce((acc: SExpValue, next: SExpValue)=>makeCompoundSExp(next, acc),makeCompoundSExp(makeEmptySExp(),makeEmptySExp()),map(CExpToSExp, exp.args)), 
+        reduce((acc: SExpValue, next: SExpValue)=>makeCompoundSExp(next, acc),makeCompoundSExp(makeEmptySExp(),makeEmptySExp()),map(CExpToSExp, exp.body)))) :
+    isLitExp(exp) ? makeCompoundSExp(makeSymbolSExp("quote"), makeSymbolSExp(exp.val.toString())) :
+    isIfExp(exp) ? makeCompoundSExp(makeSymbolSExp("if"), makeCompoundSExp(CExpToSExp(exp.test), makeCompoundSExp(CExpToSExp(exp.then), makeCompoundSExp(CExpToSExp(exp.alt), makeEmptySExp())))) :
+    isAppExp(exp) ? makeCompoundSExp(CExpToSExp(exp.rator), reduce((acc: SExpValue, next: SExpValue)=>makeCompoundSExp(next, acc),makeCompoundSExp(makeEmptySExp(),makeEmptySExp()),map(CExpToSExp, exp.rands))):
+    isLetExp(exp) ? makeCompoundSExp(makeSymbolSExp("let"), makeCompoundSExp(
+        reduce((acc: SExpValue, next: SExpValue)=>makeCompoundSExp(next, acc),makeCompoundSExp(makeEmptySExp(),makeEmptySExp()), map((x:Binding)=>CExpToSExp(x) ,exp.bindings)),
+        reduce((acc: SExpValue, next: SExpValue)=>makeCompoundSExp(next, acc),makeCompoundSExp(makeEmptySExp(),makeEmptySExp()), map(CExpToSExp, exp.body)))) :
+    makeSymbolSExp("unsupported");
 
-// Transforms any L32.CExp to L3.CExp
-const transformCExp = (exp: L32CExp): CExp =>
-    isAppExp(exp)
-        ? makeAppExp(transformCExp(exp.rator), map(transformCExp, exp.rands))
-        : isIfExp(exp)
-        ? makeIfExp(transformCExp(exp.test), transformCExp(exp.then), transformCExp(exp.alt))
-        : isProcExp(exp)
-        ? makeProcExp(exp.args, map(transformCExp, exp.body))
-        : isLetExp(exp)
-        ? makeLetExp(
-            exp.bindings.map(b => makeBinding(b.var.var, transformCExp(b.val))),
-            map(transformCExp, exp.body)
-        )
-        : isDictExp(exp)
-        ? makeAppExp(makeVarRef("dict"), [makeLitExp(dictToSExpList(exp.entries))])
-        : isLitExp(exp)
-        ? makeLitExp(valueToL3SExp(exp.val))
-        : exp as CExp; // Atomic expressions are structurally the same
 
-// Transforms an L32.Program into an L3.Program
-export const L32toL3 = (prog: Program): Program =>
-    makeProgram(prog.exps.map(exp =>
-        isDefineExp(exp)
-            ? makeDefineExp(exp.var, transformCExp(exp.val))
-            : isCExp(exp)
-            ? transformCExp(exp)
-            : exp as Exp
-    ));
+
+export const Dict2App  = (exp: ProgramL32) : ProgramL3 => {
+    const res = parseL3("(L3 (define dict (lambda (x) (quote x)))" + unparseL32(makeL32Program(map((x: Exp) => isDictExp(x) ? dictToAppExp(x) : x, exp.exps))).slice(4));
+    return isOk(res) ? res.value : makeProgram([]);
+}
+
+
+/*
+Purpose: Transform L32 program to L3
+Signature: L32ToL3(prog)
+Type: Program -> Program
+*/
+export const L32toL3 = (prog : ProgramL32): ProgramL3 => 
+    Dict2App(prog);
+    
+
+    
