@@ -79,7 +79,7 @@ export const CExpToSExp = (exp: CExp|VarDecl|Binding): SExpValue =>
 
 
 export const Dict2App  = (exp: ProgramL32) : ProgramL3 => {
-    const res = parseL3("(L3 (define dict (lambda (x) (quote x)))" + unparseL32(makeL32Program(map((x: Exp) => isDictExp(x) ? dictToAppExp(x) : x, exp.exps))).slice(4));
+    const res = parseL3("(L3 (define dict (lambda (pairs) pairs))" + unparseL32(makeL32Program(map((x: Exp) => isDictExp(x) ? dictToAppExp(x) : x, exp.exps))).slice(4));
     return isOk(res) ? res.value : makeProgram([]);
 }
 
