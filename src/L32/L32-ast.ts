@@ -344,5 +344,5 @@ export const unparseL32 = (exp: Program | Exp): string =>
     isLetExp(exp) ? unparseLetExp(exp) :
     isDefineExp(exp) ? `(define ${exp.var.var} ${unparseL32(exp.val)})` :
     isProgram(exp) ? `(L32 ${unparseLExps(exp.exps)})` :
-    isDictExp(exp) ? `(dict ${exp.entries.map(e => `(${e.key} ${unparseL32(e.val)})`).join(" ")})` :
+    isDictExp(exp) ? `(dict '(${exp.entries.map(e => `(${e.key} ${unparseL32(e.val)})`).join(" ")}))` :
     exp;

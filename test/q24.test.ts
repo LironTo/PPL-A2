@@ -131,11 +131,11 @@ describe('Q24 Tests', () => {
     });
 
     it("Q23 tests 14", () => {
-        expect(noDict(`(L32
-                          ((dict (a 1) (b 2))))`)).to.deep.equal(makeOk(true));
+        expect(noDict(`(L32 (define gahu (lambda (x) (* x x)))
+                          ((dict (b 2)) 'b))`)).to.deep.equal(makeOk(true));
             
-        expect(evalP(`(L32
-                          ((dict (a 1) (b 2))))`)).to.deep.equal(evalParse("'(dict (a 1) (b 2))"))
+        expect(evalP(`(L32 (define gahu (lambda (x) (* x x)))
+                          ((dict (b 2)) 'b))`)).to.deep.equal(evalParse("'(dict (a 1) (b 2))"))
     });
 
 });

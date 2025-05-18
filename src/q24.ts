@@ -1,5 +1,6 @@
 import { Program as ProgramL3, makeProgram as makeL3Program, makeProgram, parseL3 } from './L3/L3-ast';
-
+import * as fs from 'fs';
+import * as path from 'path';
 
 import { makeOk, makeFailure, isOk, isFailure} from './shared/result'
 
@@ -32,6 +33,7 @@ import {
 
 
 import { map, reduce } from "ramda";
+import { cons } from './shared/list';
 /*
 Purpose: rewrite all occurrences of DictExp in a program to AppExp.
 Signature: Dict2App (exp)
@@ -40,11 +42,13 @@ Type: Program -> Program
 
 // Converts L32 DictExp to L3 AppExp
 // SymbolSExp | EmptySExp | CompoundSExp
-export const dictToAppExp = (exp: DictExp): AppExp => 
-    makeAppExp(
+export const dictToAppExp = (exp: DictExp): AppExp => {
+    console.log("DictToAppExp: ", exp);
+    console.log("DictToAppExp: ", exp.entries);
+    return makeAppExp(
         makeVarRef("dict"),
         [EntriesToLitExp(exp.entries)]
-    );
+    );}
 
 // Converts DictEntries to LitExp
 export const EntriesToLitExp = (entries: DictEntry[]): LitExp => 
@@ -68,7 +72,7 @@ export const CExpToSExp = (exp: CExp|VarDecl|Binding): SExpValue =>
     isProcExp(exp) ? makeCompoundSExp(makeSymbolSExp("lambda"), makeCompoundSExp(
         reduce((acc: SExpValue, next: SExpValue)=>makeCompoundSExp(next, acc),makeCompoundSExp(makeEmptySExp(),makeEmptySExp()),map(CExpToSExp, exp.args)), 
         reduce((acc: SExpValue, next: SExpValue)=>makeCompoundSExp(next, acc),makeCompoundSExp(makeEmptySExp(),makeEmptySExp()),map(CExpToSExp, exp.body)))) :
-    isLitExp(exp) ? makeCompoundSExp(makeSymbolSExp("quote"), makeSymbolSExp(exp.val.toString())) :
+    isLitExp(exp) ? makeCompoundSExp(makeSymbolSExp(exp.val.toString()), makeEmptySExp()) :
     isIfExp(exp) ? makeCompoundSExp(makeSymbolSExp("if"), makeCompoundSExp(CExpToSExp(exp.test), makeCompoundSExp(CExpToSExp(exp.then), makeCompoundSExp(CExpToSExp(exp.alt), makeEmptySExp())))) :
     isAppExp(exp) ? makeCompoundSExp(CExpToSExp(exp.rator), reduce((acc: SExpValue, next: SExpValue)=>makeCompoundSExp(next, acc),makeCompoundSExp(makeEmptySExp(),makeEmptySExp()),map(CExpToSExp, exp.rands))):
     isLetExp(exp) ? makeCompoundSExp(makeSymbolSExp("let"), makeCompoundSExp(
@@ -79,18 +83,83 @@ export const CExpToSExp = (exp: CExp|VarDecl|Binding): SExpValue =>
 
 
 export const Dict2App  = (exp: ProgramL32) : ProgramL3 => {
-    const res = parseL3("(L3 (define dict (lambda (pairs) pairs))" + unparseL32(makeL32Program(map((x: Exp) => isDictExp(x) ? dictToAppExp(x) : x, exp.exps))).slice(4));
+    // Read q23.l3 content
+    const q23Content = `(define dict (lambda (pairs) pairs))
+                        (define get
+                            (lambda (d k)
+                                (if (pair? d)
+                                    (if (eq? (car (car d)) k)
+                                        (car (cdr (car d)))
+                                        (get (cdr d) k))
+                                    (make-error "Key not found"))))`;
+
+    //console.log("Dict2App: ", exp);
+    const newProgram = makeL32Program(map((x: Exp) => isDictExp(x) ? dictToAppExp(x) : x, exp.exps));
+    //console.log("Dict2AppNewProg: ", newProgram);
+    //console.log("Dict2AppNewProgExps: ", newProgram.exps);
+    //console.log("Dict2AppNewProgExpsTag: ", newProgram.exps[0].tag);
+    //for (let i = 0; i < newProgram.exps.length; i++) {
+        //isAppExp(newProgram.exps[i]) ? console.log("Dict2AppNewProgAppExp: ", (newProgram.exps[i] as AppExp).rator) : null;}
+    const unparsed = unparseL32(newProgram).substring(4);
+    const found = findDictKeyPairs(unparsed);
+    console.log("Found these dict get expressions", found);
+    const unparsedFixed = `(L3 ${q23Content} ${found}`;
+    console.log("Unparsed:", unparsed);
+    //console.log("Unparsed Fixed:", unparsedFixed);
+    const res = parseL3(unparsedFixed);
     return isOk(res) ? res.value : makeProgram([]);
 }
 
+
+/**
+ * Replaces every ((dict ...) '<key>) with (get (dict ...) '<key>)
+ * Only matches when the dict expression is immediately followed by a single-quote and a symbol, then a closing parenthesis.
+ */
+export function findDictKeyPairs(unparsed: string): string {
+    let i = 0;
+    let j = 0;
+    while (i < unparsed.length) {
+        if (unparsed.startsWith("(dict", i)) {
+            let start = i;
+            let parenCount = 0;
+            j = i;
+            let found = false;
+            // Find the matching closing parenthesis for the (dict ...) part
+            while (j < unparsed.length) {
+                if (unparsed[j] === '(') parenCount++;
+                if (unparsed[j] === ')') parenCount--;
+                if (parenCount === 0 && j > start) {
+                    found = true;
+                    break;
+                }
+                j++;
+            }
+            if (found) {
+                if(unparsed.length >= j + 2 && unparsed[j+1] === " " && unparsed[j+2] === "'"){
+                    // Replace the dict expression with a get expression
+                    unparsed = unparsed.slice(0, start) + "get " + unparsed.slice(start, j)  + unparsed.slice(j);
+                    i = start + 7; // Move past the new (get ...) expression
+                }
+            }
+        }
+        i++;
+    }
+    return unparsed;
+}
 
 /*
 Purpose: Transform L32 program to L3
 Signature: L32ToL3(prog)
 Type: Program -> Program
 */
-export const L32toL3 = (prog : ProgramL32): ProgramL3 => 
-    Dict2App(prog);
+export const L32toL3 = (prog : ProgramL32): ProgramL3 => {
+    console.log("HIIIIIIIIIIIIIIIIIIIII");
+    console.log("L32toL3: ", prog);
+    console.log("L32toL3: ", prog.exps);
+    console.log("L32toL3: ", prog.exps[0].tag);
+    return Dict2App(prog);
+}
+    
     
 
     
