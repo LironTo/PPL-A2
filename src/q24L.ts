@@ -62,7 +62,7 @@ export const EntriesToLitExp = (entries: DictEntry[]): LitExp =>
             map((x: DictEntry) => makeCompoundSExp(makeSymbolSExp(x.key), CExpToSExp(x.val)), entries)))
     
 export const CExpToSExp = (exp: CExp|VarDecl|Binding): SExpValue => 
-    isNumExp(exp) ? makeSymbolSExp("LOLOLOLLLOLOLOOOLOLOOLOL") :
+    isNumExp(exp) ? makeSymbolSExp(String(exp.val)) :
     isBoolExp(exp) ? makeSymbolSExp(String(exp.val)) :
     isStrExp(exp) ? makeSymbolSExp(exp.val) :
     isVarRef(exp) ? makeSymbolSExp(exp.var) :
@@ -83,23 +83,18 @@ export const CExpToSExp = (exp: CExp|VarDecl|Binding): SExpValue =>
 
 
 export const Dict2App  = (exp: ProgramL32) : ProgramL3 => {
-    // Read q23.l3 content
+
     const q23Content = `(define dict (lambda (pairs) pairs))
+                        (define unwrap (lambda (x) x))
                         (define get
                             (lambda (d k)
                                 (if (pair? d)
                                     (if (eq? (car (car d)) k)
-                                        (car (cdr (car d)))
+                                        (unwrap (car (cdr (car d))))
                                         (get (cdr d) k))
                                     (make-error "Key not found"))))`;
 
-    //console.log("Dict2App: ", exp);
     const newProgram = makeL32Program(map((x: Exp) => isDictExp(x) ? dictToAppExp(x) : x, exp.exps));
-    //console.log("Dict2AppNewProg: ", newProgram);
-    //console.log("Dict2AppNewProgExps: ", newProgram.exps);
-    //console.log("Dict2AppNewProgExpsTag: ", newProgram.exps[0].tag);
-    //for (let i = 0; i < newProgram.exps.length; i++) {
-        //isAppExp(newProgram.exps[i]) ? console.log("Dict2AppNewProgAppExp: ", (newProgram.exps[i] as AppExp).rator) : null;}
     const unparsed = unparseL32(newProgram).substring(4);
     const found = findDictKeyPairs(unparsed);
     console.log("Found these dict get expressions", found);
