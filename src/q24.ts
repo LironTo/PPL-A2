@@ -62,7 +62,7 @@ export const EntriesToLitExp = (entries: DictEntry[]): LitExp =>
             map((x: DictEntry) => makeCompoundSExp(makeSymbolSExp(x.key), CExpToSExp(x.val)), entries)))
     
 export const CExpToSExp = (exp: CExp|VarDecl|Binding): SExpValue => 
-    isNumExp(exp) ? makeSymbolSExp(String(exp.val)) :
+    isNumExp(exp) ? makeSymbolSExp("LOLOLOLLLOLOLOOOLOLOOLOL") :
     isBoolExp(exp) ? makeSymbolSExp(String(exp.val)) :
     isStrExp(exp) ? makeSymbolSExp(exp.val) :
     isVarRef(exp) ? makeSymbolSExp(exp.var) :
@@ -105,7 +105,7 @@ export const Dict2App  = (exp: ProgramL32) : ProgramL3 => {
     console.log("Found these dict get expressions", found);
     const unparsedFixed = `(L3 ${q23Content} ${found}`;
     console.log("Unparsed:", unparsed);
-    //console.log("Unparsed Fixed:", unparsedFixed);
+    console.log("Unparsed Fixed:", unparsedFixed);
     const res = parseL3(unparsedFixed);
     return isOk(res) ? res.value : makeProgram([]);
 }
