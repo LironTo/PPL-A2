@@ -84,23 +84,23 @@ export const CExpToSExp = (exp: CExp|VarDecl|Binding): SExpValue =>
 
 export const Dict2App  = (exp: ProgramL32) : ProgramL3 => {
 
-    const q23Content = `(define dict (lambda (pairs) pairs))
-                        (define unwrap (lambda (x) x))
-                        (define get
-                            (lambda (d k)
-                                (if (pair? d)
-                                    (if (eq? (car (car d)) k)
-                                        (unwrap (car (cdr (car d))))
-                                        (get (cdr d) k))
-                                    (make-error "Key not found"))))`;
+    const q23Content = `(define dict (lambda (x) x))
+
+(define get (lambda (dictio key)
+        (if (eq? dictio '())
+            (make-error "No matched key found in dict")
+            (if (eq? (car (car dictio)) key)
+                (car (cdr (car dictio)))
+                (get (cdr dictio) key)
+            )
+        )
+    )
+)`;
 
     const newProgram = makeL32Program(map((x: Exp) => isDictExp(x) ? dictToAppExp(x) : x, exp.exps));
     const unparsed = unparseL32(newProgram).substring(4);
     const found = findDictKeyPairs(unparsed);
-    console.log("Found these dict get expressions", found);
     const unparsedFixed = `(L3 ${q23Content} ${found}`;
-    console.log("Unparsed:", unparsed);
-    console.log("Unparsed Fixed:", unparsedFixed);
     const res = parseL3(unparsedFixed);
     return isOk(res) ? res.value : makeProgram([]);
 }
@@ -148,10 +148,6 @@ Signature: L32ToL3(prog)
 Type: Program -> Program
 */
 export const L32toL3 = (prog : ProgramL32): ProgramL3 => {
-    console.log("HIIIIIIIIIIIIIIIIIIIII");
-    console.log("L32toL3: ", prog);
-    console.log("L32toL3: ", prog.exps);
-    console.log("L32toL3: ", prog.exps[0].tag);
     return Dict2App(prog);
 }
     

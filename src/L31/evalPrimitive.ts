@@ -1,6 +1,6 @@
 import { reduce } from "ramda";
-import { PrimOp } from "./L31-ast";
-import { isCompoundSExp, isEmptySExp, isSymbolSExp, makeCompoundSExp, makeEmptySExp, CompoundSExp, EmptySExp, Value } from "./L31-value";
+import { makeLitExp, PrimOp } from "./L31-ast";
+import { isCompoundSExp, isEmptySExp, isSymbolSExp, makeCompoundSExp, makeEmptySExp, CompoundSExp, EmptySExp, Value, makeSymbolSExp, SExpValue } from "./L31-value";
 import { List, allT, first, isNonEmptyList, rest } from '../shared/list';
 import { isBoolean, isNumber, isString } from "../shared/type-predicates";
 import { Result, makeOk, makeFailure } from "../shared/result";
@@ -32,8 +32,8 @@ export const applyPrimitive = (proc: PrimOp, args: Value[]): Result<Value> =>
     proc.op === "boolean?" ? makeOk(typeof (args[0]) === 'boolean') :
     proc.op === "symbol?" ? makeOk(isSymbolSExp(args[0])) :
     proc.op === "string?" ? makeOk(isString(args[0])) :
-    proc.op === "dict" ? dictPrim(args) :
-    proc.op === "get" ? getPrim(args) :
+    proc.op === "dict" ? (isDictPrim(args[0]) ? makeOk(args[0]) : makeFailure(`Dict: param is not dict ${format(args[0])}`)) :
+    proc.op === "get" ? getPrim(args[0], args[1]) :
     proc.op === "dict?" ? makeOk(isDictPrim(args[0])) :
     makeFailure(`Bad primitive op: ${format(proc.op)}`);
 
@@ -47,30 +47,7 @@ const minusPrim = (args: Value[]): Result<number> => {
         return makeFailure(`Type error: - expects numbers ${format(args)}`);
     }
 };
-const dictPrim = (args: Value[]): Result<Value> =>
-    args.length === 1 && isCompoundSExp(args[0]) ? makeOk(args[0]) :
-    makeFailure(`dict expects a single quoted list of pairs: ${format(args)}`);
 
-const isDictPrim = (v: Value): boolean =>
-        isEmptySExp(v) ? true :
-        isCompoundSExp(v) && isCompoundSExp(v.val1) && isDictPrim(v.val2);
-        
-const getPrim = (args: Value[]): Result<Value> =>
-            args.length !== 2 ? makeFailure("get expects exactly 2 arguments") :
-            !isCompoundSExp(args[0]) ? makeFailure("First arg must be a dictionary") :
-            !isSymbolSExp(args[1]) ? makeFailure("Second arg must be a symbol key") :
-            getFromDict(args[0], args[1]);
-        
-const getFromDict = (dict: CompoundSExp, key: Value): Result<Value> =>
-            isCompoundSExp(dict.val1) && isSymbolSExp(dict.val1.val1)
-                ? eqPrim([dict.val1.val1, key])
-                    ? makeOk(dict.val1.val2)
-                    : isCompoundSExp(dict.val2)
-                        ? getFromDict(dict.val2, key)
-                        : makeFailure(`Key not found: ${format(key)}`)
-                : makeFailure(`Invalid dictionary pair structure: ${format(dict.val1)}`);
-        
-    
 const divPrim = (args: Value[]): Result<number> => {
     // TODO complete
     const x = args[0], y = args[1];
@@ -121,3 +98,11 @@ export const listPrim = (vals: List<Value>): EmptySExp | CompoundSExp =>
 
 const isPairPrim = (v: Value): boolean =>
     isCompoundSExp(v);
+
+const getPrim = (dict: Value, key: Value): Result<Value> => 
+    isCompoundSExp(dict) && isSymbolSExp(key) ? 
+    (isCompoundSExp(dict.val1) && isSymbolSExp(dict.val1.val1) && (dict.val1.val1.val === key.val) ? makeOk(dict.val1.val2) : getPrim(dict.val2, key)) :
+    makeFailure(`Get: param is not compound ${format(dict)}`);
+
+const isDictPrim = (v: Value): boolean => 
+    isEmptySExp(v) || (isCompoundSExp(v) && isCompoundSExp(v.val1) && isDictPrim(v.val2));

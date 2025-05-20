@@ -1,15 +1,14 @@
 // L32-eval.ts
 import { map } from "ramda";
-import { isCExp, isLetExp } from "./L32-ast";
+import { DictExp, isCExp, isLetExp } from "./L32-ast";
 import { BoolExp, CExp, Exp, IfExp, LitExp, NumExp,
-         PrimOp, ProcExp, Program, StrExp, VarDecl, DictExp } from "./L32-ast";
+         PrimOp, ProcExp, Program, StrExp, VarDecl } from "./L32-ast";
 import { isAppExp, isBoolExp, isDefineExp, isIfExp, isLitExp, isNumExp,
              isPrimOp, isProcExp, isStrExp, isVarRef, isDictExp } from "./L32-ast";
 import { makeBoolExp, makeLitExp, makeNumExp, makeProcExp, makeStrExp } from "./L32-ast";
 import { parseL32Exp } from "./L32-ast";
-import { makeDictValue, isDictValue , DictValue} from "./L32-value";
 import { applyEnv, makeEmptyEnv, makeEnv, Env } from "./L32-env";
-import { isClosure, makeClosure, Closure, Value, isSymbolSExp, SymbolSExp } from "./L32-value";
+import { isClosure, makeClosure, Closure, Value, makeSymbolSExp, makeDictValue, isDictValue, isSymbolSExp, DictValue, DictEntryValue, SymbolSExp } from "./L32-value";
 import { first, rest, isEmpty, List, isNonEmptyList } from '../shared/list';
 import { isBoolean, isNumber, isString } from "../shared/type-predicates";
 import { Result, makeOk, makeFailure, bind, mapResult, mapv } from "../shared/result";
@@ -41,18 +40,6 @@ const L32applicativeEval = (exp: CExp, env: Env): Result<Value> =>
 export const isTrueValue = (x: Value): boolean =>
     ! (x === false);
 
-const evalDictExp = (exp: DictExp, env: Env): Result<Value> =>
-    mapv(
-        mapResult(entry =>
-            mapv(L32applicativeEval(entry.val, env), (v: Value) =>
-                ({ key: entry.key, val: v })
-            ),
-        exp.entries),
-        (evaluatedEntries) =>
-            makeDictValue(evaluatedEntries)
-    );
-
-
 const evalIf = (exp: IfExp, env: Env): Result<Value> =>
     bind(L32applicativeEval(exp.test, env), (test: Value) => 
         isTrueValue(test) ? L32applicativeEval(exp.then, env) : 
@@ -61,21 +48,30 @@ const evalIf = (exp: IfExp, env: Env): Result<Value> =>
 const evalProc = (exp: ProcExp, env: Env): Result<Closure> =>
     makeOk(makeClosure(exp.args, exp.body));
 
+const evalDictExp = (exp: DictExp, env: Env): Result<Value> =>
+    mapv(
+        mapResult(entry =>
+            mapv(L32applicativeEval(entry.val, env), (v: Value) =>
+                ({ key: makeSymbolSExp(entry.key), val: v })
+            ),
+        exp.entries),
+        (evaluatedEntries) =>
+            makeDictValue(evaluatedEntries)
+    );
+
 const L32applyProcedure = (proc: Value, args: Value[], env: Env): Result<Value> =>
     isPrimOp(proc) ? applyPrimitive(proc, args) :
     isClosure(proc) ? applyClosure(proc, args, env) :
-    isDictValue(proc) && args.length === 1 && isSymbolSExp(args[0]) ?
-    applyDict(proc, args[0]) :
+    isDictValue(proc) && args.length === 1 && isSymbolSExp(args[0]) ? applyDict(proc, args[0]) :
     makeFailure(`Bad procedure ${format(proc)}`);
 
-    const applyDict = (dict: DictValue, keyArg: SymbolSExp): Result<Value> => {
-        const entry = dict.entries.find(e => e.key === keyArg.val);
+const applyDict = (dict: DictValue, key: SymbolSExp): Result<Value> => {
+    const entry = dict.entries.find(e => e.key.val === key.val);
         return entry !== undefined
             ? makeOk(entry.val)
-            : makeFailure(`Key not found in dictionary: ${keyArg.val}`);
-    };
-    
-    
+            : makeFailure(`Key not found in dictionary: ${key.val}`);
+}
+
 // Applications are computed by substituting computed
 // values into the body of the closure.
 // To make the types fit - computed values of params must be
@@ -86,9 +82,7 @@ const valueToLitExp = (v: Value): NumExp | BoolExp | StrExp | LitExp | PrimOp | 
     isString(v) ? makeStrExp(v) :
     isPrimOp(v) ? v :
     isClosure(v) ? makeProcExp(v.params, v.body) :
-    isDictValue(v) ? makeFailure("Cannot convert DictValue to literal expression") as any :
     makeLitExp(v);
-
 
 const applyClosure = (proc: Closure, args: Value[], env: Env): Result<Value> => {
     const vars = map((v: VarDecl) => v.var, proc.params);
