@@ -1,111 +1,167 @@
-import {
-    Exp, Program, isProgram, isDefineExp, isAtomicExp, isLitExp, isIfExp,
-    isProcExp, isAppExp, isLetExp, isDictExp,
-    makeProgram, makeDefineExp as makeL32DefineExp, makeIfExp, makeProcExp,
-    makeAppExp, makeLetExp, makeBinding, makeLitExp, makeVarRef, makeVarDecl, CExp
-} from "./L32/L32-ast";
+import { Program as ProgramL3, makeProgram as makeL3Program, parseL3, AppExp as L3AppExp, VarRef as L3VarRef, LitExp as L3LitExp,
+    NumExp as L3NumExp, BoolExp as L3BoolExp, StrExp as L3StrExp, PrimOp as L3PrimOp, VarDecl as L3VarDecl, Binding as L3Binding,
+    isNumExp as isL3NumExp, isBoolExp as isL3BoolExp, isStrExp as isL3StrExp, isPrimOp as isL3PrimOp, isVarDecl as isL3VarDecl, isBinding as isL3Binding,
+    isAppExp as isL3AppExp, isIfExp as isL3IfExp, isProcExp as isL3ProcExp, isLetExp as isL3LetExp, isLitExp as isL3LitExp,
+    makeAppExp as makeL3AppExp, makeLitExp as makeL3LitExp, Exp as L3Exp, makeNumExp as makeL3NumExp, makeBoolExp as makeL3BoolExp, 
+    makeStrExp as makeL3StrExp, makePrimOp as makeL3PrimOp, makeVarDecl as makeL3VarDecl, makeBinding as makeL3Binding,
+    makeDefineExp as makeL3DefineExp, DefineExp as L3DefineExp, ProcExp as L3ProcExp, makeProcExp as makeL3ProcExp,
+    makeVarRef as makeL3VarRef, makeIfExp as makeL3IfExp, makeLetExp as makeL3LetExp, parseSExp as parseL3SExp, 
+    CExp as L3CExp
+ } from './L3/L3-ast';
+import { parse } from './shared/parser'
+import { SExpValue as L3SExpValue, SymbolSExp as L3SymbolSExp, CompoundSExp as L3CompoundSExp, EmptySExp as L3EmptySExp,
+    isSymbolSExp as isL3SymbolSExp, isCompoundSExp as isL3CompoundSExp, isEmptySExp as isL3EmptySExp,
+    makeSymbolSExp as makeL3SymbolSExp, makeCompoundSExp as makeL3CompoundSExp, makeEmptySExp as makeL3EmptySExp
+} from './L3/L3-value'
+import * as fs from 'fs';
+import * as path from 'path';
+
+import { makeOk, makeFailure, isOk, isFailure} from './shared/result'
 
 import {
-    makeSymbolSExp, makeEmptySExp, makeCompoundSExp, SExpValue
-} from "./L3/L3-value";
+    isProgram as isL32Program, isDefineExp as isL32DefineExp, isCExp as isL32CExp, isAppExp as isL32AppExp, isIfExp as isL32IfExp, isProcExp as isL32ProcExp, isLetExp as isL32LetExp, isLitExp as isL32LitExp,
+    isNumExp as isL32NumExp, isBoolExp as isL32BoolExp, isStrExp as isL32StrExp, isPrimOp as isL32PrimOp, isVarRef as isL32VarRef, isDictExp,
+    Program as L32Program, CExp as L32CExp, Exp as L32Exp,
+    LitExp as L32LitExp, isAtomicExp as L32IsAtomicExp, makePrimOp as L32MakePrimOp, isVarDecl as L32IsVarDecl, Binding as L32Binding, isBinding as L32IsBinding,
+    unparseL32, AppExp as L32AppExp, DictExp, DictEntry, VarDecl as L32VarDecl, VarRef as L32VarRef, Program as ProgramL32,
+    makeProgram as makeL32Program, DefineExp as L32DefineExp, isVarDecl as isL32VarDecl, isBinding as isL32Binding,
+    parseL32, 
+} from './L32/L32-ast';
 
 import {
-    Program as L3Program, Exp as L3Exp, makeProgram as makeL3Program,
-    makeDefineExp as makeL3DefineExp, makeProcExp as makeL3ProcExp,
-    makeAppExp as makeL3AppExp, makeIfExp as makeL3IfExp,
-    makeVarRef as makeL3VarRef, makeVarDecl as makeL3VarDecl
-} from "./L3/L3-ast";
+    makeCompoundSExp as makeL32CompundSExp, makeEmptySExp as makeL32EmptySExp , makeSymbolSExp as makeL32SymbolSExp,
+    SExpValue as L32SExpValue, CompoundSExp as L32CompoundSExp, SymbolSExp as L32SymbolSExp, EmptySExp as L32EmptySExp,
+    isCompoundSExp as isL32CompoundSExp, isSymbolSExp as isL32SymbolSExp, isEmptySExp as isL32EmptySExp
+} from './L32/L32-value';
 
-import { isNumExp, isBoolExp, isStrExp, isPrimOp, isVarRef } from "./L32/L32-ast";
 
-// ממיר ערך של ביטוי מילון לערך SExp
-const expToSExpValue = (e: CExp): SExpValue => {
-    if (isNumExp(e)) return e.val;
-    if (isBoolExp(e)) return e.val;
-    if (isStrExp(e)) return e.val;
-    if (isPrimOp(e)) return e;
-    if (isVarRef(e)) return makeSymbolSExp(e.var);
-    if (isLitExp(e)) return (e as any).val;
-    throw new Error(`Unsupported dict value in transformation: ${JSON.stringify(e)}`);
-};
 
-// ממיר רשימת entries של מילון ל־CompoundSExp ב־L3
-const transformDictEntriesToQuotedList = (entries: { key: string; val: CExp }[]): SExpValue =>
-    entries.reduceRight<SExpValue>(
-        (acc, { key, val }) =>
-            makeCompoundSExp(
-                makeCompoundSExp(makeSymbolSExp(key), expToSExpValue(val)),
-                acc
-            ),
-        makeEmptySExp()
-    );
 
-// ממיר ביטויי dict ל־AppExp חוקי, ומחליף את כל המופעים בתוכנית
-export const Dict2App = (exp: Program | Exp): Program | Exp =>
-    isAtomicExp(exp) || isLitExp(exp)
-        ? exp
-        : isIfExp(exp)
-        ? makeIfExp(Dict2App(exp.test) as CExp, Dict2App(exp.then) as CExp, Dict2App(exp.alt) as CExp)
-        : isProcExp(exp)
-        ? makeProcExp(exp.args, exp.body.map(b => Dict2App(b) as CExp))
-        : isAppExp(exp)
-        ? makeAppExp(Dict2App(exp.rator) as CExp, exp.rands.map(r => Dict2App(r) as CExp))
-        : isLetExp(exp)
-        ? makeLetExp(
-            exp.bindings.map(b => makeBinding(b.var.var, Dict2App(b.val) as CExp)),
-            exp.body.map(b => Dict2App(b) as CExp)
-        )
-        : isDefineExp(exp)
-        ? makeL32DefineExp(exp.var, Dict2App(exp.val) as CExp)
-        : isDictExp(exp)
-        ? makeAppExp(makeVarRef("dict"), [makeLitExp(transformDictEntriesToQuotedList(exp.entries))])
-        : isProgram(exp)
-        ? makeProgram(exp.exps.map(Dict2App) as Exp[])
-        : exp;
+import { map, reduce } from "ramda";
+import { cons } from './shared/list';
+/*
+Purpose: rewrite all occurrences of DictExp in a program to AppExp.
+Signature: Dict2App (exp)
+Type: Program -> Program
+*/
 
-// יוצר הגדרה עבור get בלשון L3
-const makeGetDefine = (): L3Exp =>
-    makeL3DefineExp(
-        makeL3VarDecl("get"),
-        makeL3ProcExp(
-            [makeL3VarDecl("pairs"), makeL3VarDecl("key")],
-            [makeL3IfExp(
-                makeL3AppExp(makeL3VarRef("eq?"), [
-                    makeL3AppExp(makeL3VarRef("car"), [
-                        makeL3AppExp(makeL3VarRef("car"), [makeL3VarRef("pairs")])
-                    ]),
-                    makeL3VarRef("key")
-                ]),
-                makeL3AppExp(makeL3VarRef("cdr"), [
-                    makeL3AppExp(makeL3VarRef("car"), [makeL3VarRef("pairs")])
-                ]),
-                makeL3AppExp(makeL3VarRef("get"), [
-                    makeL3AppExp(makeL3VarRef("cdr"), [makeL3VarRef("pairs")]),
-                    makeL3VarRef("key")
-                ])
-            )]
-        )
-    );
+// Converts L32 DictExp to L3 AppExp
+// SymbolSExp | EmptySExp | CompoundSExp
 
-// יוצר הגדרה עבור dict שמחזירה פונקציית חיפוש
-const makeDictDefine = (): L3Exp =>
-    makeL3DefineExp(
-        makeL3VarDecl("dict"),
-        makeL3ProcExp(
-            [makeL3VarDecl("pairs")],
-            [makeL3ProcExp(
-                [makeL3VarDecl("key")],
-                [makeL3AppExp(makeL3VarRef("get"), [makeL3VarRef("pairs"), makeL3VarRef("key")])]
-            )]
-        )
-    );
 
-// ממיר תוכנית L32 לתוכנית L3 תקינה
-export const L32toL3 = (exp: Program): L3Program => {
-    const transformed = Dict2App(exp) as Program;
-    return makeL3Program([
-        makeGetDefine(),
-        makeDictDefine(),
-        ...(transformed.exps as L3Exp[])
-    ]);
-};
+    
+// export const CExpToSExp = (exp: L32CExp|L32VarDecl|L32Binding): L3SExpValue => 
+//     isL32NumExp(exp) ? makeL3SymbolSExp(String(exp.val)) :
+//     isL32BoolExp(exp) ? makeL3SymbolSExp(String(exp.val)) :
+//     isL32StrExp(exp) ? makeL3SymbolSExp(exp.val) :
+//     isL32VarRef(exp) ? makeL3SymbolSExp(exp.var) :
+//     isL32VarDecl(exp) ? makeL3SymbolSExp(exp.var) :
+//     isL32Binding(exp) ? makeL3CompoundSExp(CExpToSExp(exp.var), CExpToSExp(exp.val)) :
+//     isL32PrimOp(exp) ? makeL3SymbolSExp(exp.op) :
+//     isL32ProcExp(exp) ? makeL3CompoundSExp(makeL3SymbolSExp("lambda"), makeL3CompoundSExp(
+//         reduce((acc: L3SExpValue, next: L3SExpValue)=>makeL3CompoundSExp(next, acc),makeL3CompoundSExp(makeL3EmptySExp(),makeL3EmptySExp()),map(CExpToSExp, exp.args)), 
+//         reduce((acc: L3SExpValue, next: L3SExpValue)=>makeL3CompoundSExp(next, acc),makeL3CompoundSExp(makeL3EmptySExp(),makeL3EmptySExp()),map(CExpToSExp, exp.body)))) :
+//     isL32LitExp(exp) ? makeL3CompoundSExp(makeL3SymbolSExp(exp.val.toString()), makeL3EmptySExp()) :
+//     isL32IfExp(exp) ? makeL3CompoundSExp(makeL3SymbolSExp("if"), makeL3CompoundSExp(CExpToSExp(exp.test), makeL3CompoundSExp(CExpToSExp(exp.then), makeL3CompoundSExp(CExpToSExp(exp.alt), makeL3EmptySExp())))) :
+//     isL32AppExp(exp) ? makeL3CompoundSExp(CExpToSExp(exp.rator), reduce((acc: L3SExpValue, next: L3SExpValue)=>makeL3CompoundSExp(next, acc),makeL3CompoundSExp(makeL3EmptySExp(),makeL3EmptySExp()),map(CExpToSExp, exp.rands))):
+//     makeL3SymbolSExp("unsupported");
+
+
+
+export const Dict2App  = (exp: ProgramL32) : ProgramL3 => 
+    makeL3Program(map(L32ExpToL3Exp, exp.exps));
+
+const L32ExpToL3Exp = (exp: L32Exp): L3Exp =>
+    isL32CExp(exp) ? L32CExpToL3CExp(exp) :
+    isL32DefineExp(exp) ? L32DefineExpToL3DefineExp(exp) :
+    exp
+
+const L32VarDeclExpToL3VarDeclExp = (exp: L32VarDecl): L3VarDecl =>
+    makeL3VarDecl(exp.var)
+
+const L32DefineExpToL3DefineExp = (exp: L32DefineExp): L3DefineExp =>
+    makeL3DefineExp(exp.var, L32CExpToL3CExp(exp.val))
+
+const L32CExpToL3CExp = (exp: L32CExp): L3CExp =>
+    isL32NumExp(exp) ? makeL3NumExp(exp.val) :
+    isL32BoolExp(exp) ? makeL3BoolExp(exp.val) :
+    isL32StrExp(exp) ? makeL3StrExp(exp.val) :
+    isL32PrimOp(exp) ? makeL3PrimOp(exp.op) :
+    isL32VarRef(exp) ? makeL3VarRef(exp.var) :
+    isL32ProcExp(exp) ? makeL3ProcExp(exp.args, map(L32CExpToL3CExp, exp.body)) :
+    isL32LitExp(exp) ? makeL3LitExp(L32SExpValueToL3SExpValue(exp.val)) :
+    isL32AppExp(exp) ? makeL3AppExp(L32CExpToL3CExp(exp.rator), map(L32CExpToL3CExp, exp.rands)) :
+    isL32IfExp(exp) ? makeL3IfExp(L32CExpToL3CExp(exp.test), L32CExpToL3CExp(exp.then), L32CExpToL3CExp(exp.alt)) :
+    isL32LetExp(exp) ? makeL3LetExp(map(L32BindingToL3Binding, exp.bindings), map(L32CExpToL3CExp, exp.body)) :
+    isDictExp(exp) ? makeL3AppExp(makeL3VarRef("dict"), [L32DictExpEntriesToL3LitExp(exp)]) :
+    makeL3StrExp("unsupported")
+
+const L32DictExpEntriesToL3LitExp = (exp: DictExp): L3LitExp =>
+    makeL3LitExp(RecurMakeCompound(map(L32DictEntryToL3CompoundExp, exp.entries)))
+    
+const RecurMakeCompound = (entries: L3CompoundSExp[]) : L3SExpValue =>
+    (entries.length === 0) ? makeL3EmptySExp() : makeL3CompoundSExp(entries[0], RecurMakeCompound(entries.slice(1)))
+
+const L32DictEntryToL3CompoundExp = (entry: DictEntry) : L3CompoundSExp =>
+    makeL3CompoundSExp(makeL3SymbolSExp(entry.key), EntryValToL3SExpValue(entry.val))
+
+const EntryValToL3SExpValue = (val: L32CExp) : L3SExpValue =>
+    isL32LitExp(val) ? L32SExpValueToL3SExpValue(val.val) :
+    isL32CExp(val) ? CExpToL3SExpValue(val) :
+    makeL3SymbolSExp("unsupported")
+
+const CExpToL3SExpValue = (exp: L32CExp) : L3SExpValue => {
+    const firstP = parse(unparseL32(exp))
+    const secondP = (isOk(firstP) ? parseL3SExp(firstP.value) : "unsupported")
+    return ((secondP === "unsupported") ? "unsupported" : (isOk(secondP) ? secondP.value : "unsupported"))
+}
+
+
+const L32SExpValueToL3SExpValue = (exp: L32SExpValue): L3SExpValue =>
+    isL32SymbolSExp(exp) ? makeL3SymbolSExp(exp.val) :
+    isL32CompoundSExp(exp) ? makeL3CompoundSExp(L32SExpValueToL3SExpValue(exp.val1), L32SExpValueToL3SExpValue(exp.val2)) :
+    isL32EmptySExp(exp) ? makeL3EmptySExp() :
+    makeL3SymbolSExp("unsupported")
+
+const L32BindingToL3Binding = (exp: L32Binding): L3Binding =>
+    makeL3Binding(exp.var.var, L32CExpToL3CExp(exp.val))
+
+
+
+/*
+Purpose: Transform L32 program to L3
+Signature: L32ToL3(prog)
+Type: Program -> Program
+*/
+export const L32toL3 = (prog : ProgramL32): ProgramL3 => {
+    const q23Content = `(L3 (define duo 
+                                    (lambda (dictio key func) 
+                                            (if (eq? dictio '())
+                                                    "key not found"
+                                                    (if (eq? (car (car dictio)) key)
+                                                        (cdr (car dictio))
+                                                        (func (cdr dictio) key)
+                                                        ))))
+                            (define dict 
+                                (lambda (key) 
+                                    (lambda (value) 
+                                        (duo key value duo)
+                            )))
+    
+                            (define get (lambda (dictio key)
+                                (if (eq? dictio '())
+                                    (make-error "No matched key found in dict")
+                                    (if (eq? (car (car dictio)) key)
+                                        (car (cdr (car dictio)))
+                                        (get (cdr dictio) key)
+                                    )
+                                )
+                            )
+                        ))`;
+    const q23Parsed = parseL3(q23Content);
+    return isOk(q23Parsed) ? makeL3Program([...q23Parsed.value.exps, ...Dict2App(prog).exps]) : makeL3Program([]);
+}
+    
+    
+
+    
