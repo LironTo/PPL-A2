@@ -35,9 +35,8 @@ import { Sexp, Token } from "s-expression";
 ;;         |  ( <cexp> <cexp>* )            / AppExp(operator:CExp, operands:CExp[]))
 ;; <binding>  ::= ( <var> <cexp> )           / Binding(var:VarDecl, val:Cexp)
 ;; <prim-op>  ::= + | - | * | / | < | > | = | not |  and | or | eq? | string=?
-;;                  | cons | car | cdr | pair? | number? | list 
+;;                  | cons | car | cdr | pair? | number? | list| dict| dict?| get 
 ;;                  | boolean? | symbol? | string?      ##### L3
-;;                  | dict | get | dict? ##### L31
 ;; <num-exp>  ::= a number token
 ;; <bool-exp> ::= #t | #f
 ;; <var-ref>  ::= an identifier token
@@ -66,7 +65,7 @@ export type ProcExp = {tag: "ProcExp"; args: VarDecl[], body: CExp[]; }
 export type Binding = {tag: "Binding"; var: VarDecl; val: CExp; }
 export type LetExp = {tag: "LetExp"; bindings: Binding[]; body: CExp[]; }
 // L3
-export type LitExp = {tag: "LitExp"; val: SExpValue; }
+export type LitExp = {tag: "LitExp"; val: SExpValue; } 
 
 // Type value constructors for disjoint types
 export const makeProgram = (exps: Exp[]): Program => ({tag: "Program", exps: exps});
@@ -118,7 +117,7 @@ export const isAtomicExp = (x: any): x is AtomicExp =>
     isNumExp(x) || isBoolExp(x) || isStrExp(x) ||
     isPrimOp(x) || isVarRef(x);
 export const isCompoundExp = (x: any): x is CompoundExp =>
-    isAppExp(x) || isIfExp(x) || isProcExp(x) || isLitExp(x) || isLetExp(x);
+    isAppExp(x) || isIfExp(x) || isProcExp(x) || isLitExp(x) || isLetExp(x)
 export const isCExp = (x: any): x is CExp =>
     isAtomicExp(x) || isCompoundExp(x);
 
@@ -202,7 +201,7 @@ export const parseL31Atomic = (token: Token): Result<CExp> =>
 
 /*
     ;; <prim-op>  ::= + | - | * | / | < | > | = | not | and | or | eq? | string=?
-    ;;                  | cons | car | cdr | pair? | number? | list
+    ;;                  | cons | car | cdr | pair? | number? | list| dict| dict?| get 
     ;;                  | boolean? | symbol? | string?      ##### L3
 */
 const isPrimitiveOp = (x: string): boolean =>

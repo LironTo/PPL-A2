@@ -37,37 +37,12 @@ import {
 
 
 
-import { map, reduce } from "ramda";
-import { cons } from './shared/list';
+import { map } from "ramda";
 /*
 Purpose: rewrite all occurrences of DictExp in a program to AppExp.
 Signature: Dict2App (exp)
 Type: Program -> Program
 */
-
-// Converts L32 DictExp to L3 AppExp
-// SymbolSExp | EmptySExp | CompoundSExp
-
-
-    
-// export const CExpToSExp = (exp: L32CExp|L32VarDecl|L32Binding): L3SExpValue => 
-//     isL32NumExp(exp) ? makeL3SymbolSExp(String(exp.val)) :
-//     isL32BoolExp(exp) ? makeL3SymbolSExp(String(exp.val)) :
-//     isL32StrExp(exp) ? makeL3SymbolSExp(exp.val) :
-//     isL32VarRef(exp) ? makeL3SymbolSExp(exp.var) :
-//     isL32VarDecl(exp) ? makeL3SymbolSExp(exp.var) :
-//     isL32Binding(exp) ? makeL3CompoundSExp(CExpToSExp(exp.var), CExpToSExp(exp.val)) :
-//     isL32PrimOp(exp) ? makeL3SymbolSExp(exp.op) :
-//     isL32ProcExp(exp) ? makeL3CompoundSExp(makeL3SymbolSExp("lambda"), makeL3CompoundSExp(
-//         reduce((acc: L3SExpValue, next: L3SExpValue)=>makeL3CompoundSExp(next, acc),makeL3CompoundSExp(makeL3EmptySExp(),makeL3EmptySExp()),map(CExpToSExp, exp.args)), 
-//         reduce((acc: L3SExpValue, next: L3SExpValue)=>makeL3CompoundSExp(next, acc),makeL3CompoundSExp(makeL3EmptySExp(),makeL3EmptySExp()),map(CExpToSExp, exp.body)))) :
-//     isL32LitExp(exp) ? makeL3CompoundSExp(makeL3SymbolSExp(exp.val.toString()), makeL3EmptySExp()) :
-//     isL32IfExp(exp) ? makeL3CompoundSExp(makeL3SymbolSExp("if"), makeL3CompoundSExp(CExpToSExp(exp.test), makeL3CompoundSExp(CExpToSExp(exp.then), makeL3CompoundSExp(CExpToSExp(exp.alt), makeL3EmptySExp())))) :
-//     isL32AppExp(exp) ? makeL3CompoundSExp(CExpToSExp(exp.rator), reduce((acc: L3SExpValue, next: L3SExpValue)=>makeL3CompoundSExp(next, acc),makeL3CompoundSExp(makeL3EmptySExp(),makeL3EmptySExp()),map(CExpToSExp, exp.rands))):
-//     makeL3SymbolSExp("unsupported");
-
-
-
 export const Dict2App  = (exp: ProgramL32) : ProgramL3 => 
     makeL3Program(map(L32ExpToL3Exp, exp.exps));
 
@@ -75,9 +50,6 @@ const L32ExpToL3Exp = (exp: L32Exp): L3Exp =>
     isL32CExp(exp) ? L32CExpToL3CExp(exp) :
     isL32DefineExp(exp) ? L32DefineExpToL3DefineExp(exp) :
     exp
-
-const L32VarDeclExpToL3VarDeclExp = (exp: L32VarDecl): L3VarDecl =>
-    makeL3VarDecl(exp.var)
 
 const L32DefineExpToL3DefineExp = (exp: L32DefineExp): L3DefineExp =>
     makeL3DefineExp(exp.var, L32CExpToL3CExp(exp.val))
@@ -148,16 +120,7 @@ export const L32toL3 = (prog : ProgramL32): ProgramL3 => {
                                         (duo key value duo)
                             )))
     
-                            (define get (lambda (dictio key)
-                                (if (eq? dictio '())
-                                    (make-error "No matched key found in dict")
-                                    (if (eq? (car (car dictio)) key)
-                                        (car (cdr (car dictio)))
-                                        (get (cdr dictio) key)
-                                    )
-                                )
-                            )
-                        ))`;
+                            )`;
     const q23Parsed = parseL3(q23Content);
     return isOk(q23Parsed) ? makeL3Program([...q23Parsed.value.exps, ...Dict2App(prog).exps]) : makeL3Program([]);
 }
