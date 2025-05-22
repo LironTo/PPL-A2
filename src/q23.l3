@@ -6,23 +6,82 @@
             (list? (cdr x))
             #f))))
 
-(define dict (lambda (pairs) pairs))
+(define dict (lambda (x) x))
 
-(define get
-  (lambda (d k)
-    (if (pair? d)
-        (if (eq? (car (car d)) k)
-            (cdr (car d))
-            (get (cdr d) k))
-        (make-error "Key not found"))))
+(define get (lambda (dictio key)
+        (if (eq? dictio '())
+            (make-error "No matched key found in dict")
+            (if (eq? (car (car dictio)) key)
+                (cdr (car dictio))
+                (get (cdr dictio) key)
+            )
+        )
+    )
+)
 
-(define dict?
-  (lambda (x)
-    (if (list? x)
-        (if (pair? (car x))
-            (symbol? (car (car x)))
-            #f)
-        #f)))
+(define dict? (lambda (dictio)
+        (if (dictform dictio)
+            (if (allSymbols? dictio)
+                (if (dupkeys? dictio)
+                    #f
+                    #t
+                )
+                #f
+            )
+            #f
+        )
+    )
+)
+
+(define dictform 
+    (lambda (dictio) 
+        (if (eq? dictio '())
+            #t
+            (if
+                (pair? dictio)
+                (if (pair? (car dictio))
+                    (dictform (cdr dictio))
+                    #f
+                )
+                #f
+            )
+        )
+    )
+)
+
+(define allSymbols? (lambda (dictio)
+        (if (eq? dictio '())
+            #t
+            (if (symbol? (car (car dictio)))
+                (allSymbols? (cdr dictio))
+                #f
+            )
+        )
+    )
+)
+
+(define dupkeys? 
+    (lambda (dictio)
+        (if (eq? dictio '())
+            #f
+            (if (valInDict (cdr dictio) (car (car dictio)))
+                #t
+                (dupkeys? (cdr dictio))
+            )
+        )
+    )
+)
+
+(define valInDict (lambda (dictio val)
+        (if (eq? dictio '())
+            #f
+            (if (eq? (car (car dictio)) val)
+                #t
+                (valInDict (cdr dictio) val)
+            )
+        )
+    )
+)
 
 (define make-error (lambda (msg) (list 'error msg)))
 
